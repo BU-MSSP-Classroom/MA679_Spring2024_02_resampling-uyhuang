@@ -3,6 +3,9 @@ title: "Resampling"
 author: "Your Name Here"
 date: "2022-12-30"
 output: html_document
+editor_options: 
+  markdown: 
+    wrap: sentence
 ---
 
 ```{r setup, include=FALSE}
@@ -16,9 +19,12 @@ pacman::p_load(
       , RColorBrewer
       , lubridate
       , AmesHousing
+      , mlr3
+      , mlr3learners
+      , caret
+      , boot
       )
 ```
-
 
 ```{css}
 .btn {
@@ -38,6 +44,7 @@ pacman::p_load(
 # Global parameter
 show_code <- TRUE
 ```
+
 # Class Workbook {.tabset .tabset-fade .tabset-pills}
 
 ## In class activity
@@ -49,17 +56,83 @@ library(AmesHousing)
 ?ames_raw
 ```
 
-Let's revisit the AmesHousing data.  As we did in the previous class, I will split the data into before 2008 and after.  The data up to 2008 will be the training data and after 2008 will be the testing data.
+Let's revisit the AmesHousing data.
+As we did in the previous class, I will split the data into before 2008 and after.
+The data up to 2008 will be the training data and after 2008 will be the testing data.
 
 ```{r,echo=show_code}
 ames_raw_2008=ames_raw[ames_raw$`Yr Sold`<2008,]
 ames_raw_2009=ames_raw[ames_raw$`Yr Sold`>=2008,]
 ```
 
+-   For the regression model fit, use bootstrap to compare the standard error estimates to the model based estimates.
 
+Your code:
 
-* For the regression model fit, use bootstrap to compare the standard error estimates to the model based estimates.
+```{r,echo=TRUE}
+set.seed(123)
 
+fit1 <- lm(log(SalePrice) ~ `Garage Area`+`1st Flr SF`+`Gr Liv Area`+`Full Bath`+`Year Built`+`Year Remod/Add`,
+           ames_raw_2008)
+
+print(coef(summary(fit1))[, "Std. Error"])
+
+boot_func <- function(data, indices) {
+  sample_data <- data[indices, ]
+  model <- lm(log(SalePrice)~`Garage Area`+`1st Flr SF`+`Gr Liv Area`+`Full Bath`+`Year Built`+`Year Remod/Add`,sample_data)
+  return(coef(summary(model))[, "Std. Error"])
+}
+print(boot(data = ames_raw_2008, statistic = boot_func, R = 1000))
+```
+
+Your answer:
+
+```         
+Please write your answer in full sentences.
+```
+
+-   Use cross validation to decide which model has a good predictive accuracy. Does the result hold true for the prediction of future data?
+
+Your code:
+
+```{r,echo=TRUE}
+
+preprocess_recipe <- recipe(SalePrice ~ `Garage Area`+`1st Flr SF`+`Gr Liv Area`+`Full Bath`+`Year Built`+`Year Remod/Add`, data = ames_raw_2008)
+cv_control <- trainControl(method = "cv", number = 10)
+cv_results_lm <- train(preprocess_recipe, data = ames_raw_2008, method = "lm",
+                       trControl = cv_control)
+print(summary(cv_results_lm))
+```
+
+Your answer:
+
+```         
+Yes, the result holds true for the future data.
+```
+
+-   Using `knn.reg` fit KNN regression model. Use cross validation to decide which K to use.
+
+Your code:
+
+```{r,echo=TRUE}
+
+k_values <- 1:20
+
+knn_model <- train(log(SalePrice) ~ `Gr Liv Area` + `Overall Qual` + `Year Built`,
+                   data = ames_raw_2008,
+                   method = "knn",
+                   trControl = trainControl(method = "cv", number = 10),
+                   tuneGrid = expand.grid(k = k_values))
+print(knn_model)
+```
+
+Your answer:
+
+```         
+The final value used for the model was k = 9.
+```
+
+-   Which model performs better on your training data? Which model performs better in your future prediction?
 
 Your code:
 
@@ -70,74 +143,20 @@ Your code:
 
 Your answer:
 
-~~~
-Please write your answer in full sentences.
-
-
-~~~
-
-
-* Use cross validation  to decide which model has a good predictive accuracy.  Does the result hold true for the prediction of future data?
-
-Your code:
-
-```{r,echo=TRUE}
-#
-#
+```         
+The cross validation using linear regression is better on the training data, and the KNN regression model is better in the future regression.
 ```
-
-Your answer:
-
-~~~
-Please write your answer in full sentences.
-
-
-~~~
-
-
-* Using `knn.reg` fit KNN regression model.  Use cross validation to decide which K to use.
-
-Your code:
-
-```{r,echo=TRUE}
-#
-#
-```
-
-Your answer:
-
-~~~
-Please write your answer in full sentences.
-
-
-~~~
-
-
-* Which model performs better on your training data?  Which model performs better in your future prediction?
-
-Your code:
-
-```{r,echo=TRUE}
-#
-#
-```
-
-Your answer:
-
-~~~
-Please write your answer in full sentences.
-
-
-~~~
 
 ## Problem Set
 
 ### Bootstrap
 
-We will investigate numerically the probability that a bootstrap sample of size n = 100 contains the jth observation. Here j = 4. We repeatedly create bootstrap samples, and each time
-we record whether or not the fourth observation is contained in the bootstrap sample.
+We will investigate numerically the probability that a bootstrap sample of size n = 100 contains the jth observation.
+Here j = 4.
+We repeatedly create bootstrap samples, and each time we record whether or not the fourth observation is contained in the bootstrap sample.
 
 Here is the code to get you going
+
 ```{r,echo =TRUE,eval=FALSE}
 store <- rep(NA, 10000)
 for(i in 1:10000){
@@ -148,7 +167,6 @@ mean(store)
 
 Comment on the results obtained.
 
-
 Your code:
 
 ```{r,echo=TRUE}
@@ -158,12 +176,9 @@ Your code:
 
 Your answer:
 
-~~~
-Please write your answer in full sentences.
-
-
-~~~
-
+```         
+The fourth observation is 0.6312
+```
 
 ### CV
 
@@ -176,9 +191,8 @@ x <- rnorm (100)
 y <- x - 2 * x^2 + rnorm (100)
 ```
 
-In this data set, what is n and what is p? Write out the model
-used to generate the data in equation form.
-
+In this data set, what is n and what is p?
+Write out the model used to generate the data in equation form.
 
 Your code:
 
@@ -189,75 +203,96 @@ Your code:
 
 Your answer:
 
-~~~
-Please write your answer in full sentences.
-
-
-~~~
-
+```         
+n = 100, p = 1
+```
 
 (b) Create a scatterplot of X against Y . Comment on what you find.
 
-
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+plot(x, y, main = "Scatterplot of X against Y", xlab = "X", ylab = "Y")
 ```
 
 Your answer:
 
-~~~
-Please write your answer in full sentences.
-
-
-~~~
+```         
+There's roughtly a quadratice relationship between X and Y
+```
 
 (c) Set a random seed, and then compute the LOOCV errors that result from fitting the following four models using least squares:
 
-i.   $Y = \beta_0 + \beta_1X + \epsilon$
-ii.  $Y = \beta_0 + \beta_1X + \beta_2X^2 + \epsilon$
+<!-- -->
+
+i.  $Y = \beta_0 + \beta_1X + \epsilon$
+ii. $Y = \beta_0 + \beta_1X + \beta_2X^2 + \epsilon$
 iii. $Y = \beta_0 + \beta_1X + \beta_2X^2 + \beta_3X^3 + \epsilon$
-iv.  $Y = \beta_0 + \beta_1X + \beta_2X^2 + \beta_3X^3 + \beta_4X^4 + \epsilon$.
+iv. $Y = \beta_0 + \beta_1X + \beta_2X^2 + \beta_3X^3 + \beta_4X^4 + \epsilon$.
 
-Note you may find it helpful to use the `data.frame()` function
-to create a single data set containing both $X$ and $Y$ .
-
+Note you may find it helpful to use the `data.frame()` function to create a single data set containing both $X$ and $Y$ .
 
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+set.seed(100)
+d <- data.frame(x,y)
+
+loocv_error <- function(model_formula, data) {
+  fit <- glm(model_formula, data = data)
+  cv <- cv.glm(data, fit, K = nrow(data))
+  return(cv$delta[1])
+}
+
+
+loocv_error_1 <- loocv_error(y ~ x, d)
+loocv_error_2 <- loocv_error(y ~ x + I(x^2), d)
+loocv_error_3 <- loocv_error(y ~ x + I(x^2) + I(x^3), d)
+loocv_error_4 <- loocv_error(y ~ x + I(x^2) + I(x^3) + I(x^4), d)
+
+print(loocv_error_1)
+print(loocv_error_2)
+print(loocv_error_3)
+print(loocv_error_4)
 ```
 
 Your answer:
 
-~~~
-Please write your answer in full sentences.
+```         
+Thebest model is model 2 with a LOOCV error of 1.03323205776838
+```
 
-
-~~~
-
-
-(d) Repeat (c) using another random seed, and report your results.
-Are your results the same as what you got in (c)? Why?
+(d) Repeat (c) using another random seed, and report your results. Are your results the same as what you got in (c)? Why?
 
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+set.seed(679)
+d <- data.frame(x,y)
+
+loocv_error <- function(model_formula, data) {
+  fit <- glm(model_formula, data = data)
+  cv <- cv.glm(data, fit, K = nrow(data))
+  return(cv$delta[1])
+}
+
+
+loocv_error_1 <- loocv_error(y ~ x, d)
+loocv_error_2 <- loocv_error(y ~ x + I(x^2), d)
+loocv_error_3 <- loocv_error(y ~ x + I(x^2) + I(x^3), d)
+loocv_error_4 <- loocv_error(y ~ x + I(x^2) + I(x^3) + I(x^4), d)
+
+print(loocv_error_1)
+print(loocv_error_2)
+print(loocv_error_3)
+print(loocv_error_4)
 ```
 
 Your answer:
 
-~~~
-Please write your answer in full sentences.
-
-
-~~~
+```         
+The LOOCV errors remain the same despite changing the set.seed() because LOOCV is deterministic for a given dataset and set of models; changing the random seed does not affect the LOOCV process.
+```
 
 (e) Which of the models in (c) had the smallest LOOCV error? Is this what you expected? Explain your answer.
 
@@ -270,236 +305,275 @@ Your code:
 
 Your answer:
 
-~~~
-Please write your answer in full sentences.
-
-
-~~~
-
+```         
+The model has the smallest loocv is model 2, and this is just as my expectation. As we obsered in the scatter plot, the relationship of x and y is roughly y = x^2.
+```
 
 (f) Comment on the statistical significance of the coefficient estimates that results from fitting each of the models in (c) using least squares. Do these results agree with the conclusions drawn based on the cross-validation results?
-
 
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+model1 <- lm(y ~ x, data = d)
+model2 <- lm(y ~ x + I(x^2), data = d)
+model3 <- lm(y ~ x + I(x^2) + I(x^3), data = d)
+model4 <- lm(y ~ x + I(x^2) + I(x^3) + I(x^4), data = d)
+
+summary(model1)
+summary(model2)
+summary(model3)
+summary(model4)
+
+loocv_errors <- c(loocv_error_1, loocv_error_2, loocv_error_3, loocv_error_4)
+best_model <- which.min(loocv_errors)
 ```
 
 Your answer:
 
-~~~
-Please write your answer in full sentences.
-
-
-~~~
-
-
-
+```         
+Yes the result of coefficients agrees with the previous result.
+```
 
 ### Default 1
 
-In Chapter 4, we used logistic regression to predict the probability of default using income and balance on the `Default` data set. We will now estimate the test error of this logistic regression model using the validation set approach. Do not forget to set a random seed before beginning your analysis.
+In Chapter 4, we used logistic regression to predict the probability of default using income and balance on the `Default` data set.
+We will now estimate the test error of this logistic regression model using the validation set approach.
+Do not forget to set a random seed before beginning your analysis.
 
 (a) Fit a logistic regression model that uses income and balance to predict default.
 
 Your code:
 
 ```{r,echo=TRUE}
-#
+default <- Default
+fit2 <- glm(default~student+balance+income, family = "binomial", data = default)
+summary(fit2)
 #
 ```
 
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
-
-
-~~~
-
+```
 
 (b) Using the validation set approach, estimate the test error of this model. In order to do this, you must perform the following steps:
 
-i. Split the sample set into a training set and a validation set.
+<!-- -->
+
+i.  Split the sample set into a training set and a validation set.
 
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+splitIndex <- createDataPartition(y = default$default, p = 0.7, list = FALSE, times = 1)
+training_set <- default[splitIndex, ]
+validation_set <- default[-splitIndex, ]
 ```
 
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
-
-
-~~~
+```
 
 ii. Fit a multiple logistic regression model using only the training observations.
 
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+fit3 <- glm(default ~ student + balance + income, data = training_set, family = binomial)
+summary(fit3)
 ```
 
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
-
-
-~~~
-
+```
 
 iii. Obtain a prediction of default status for each individual in the validation set by computing the posterior probability of default for that individual, and classifying the individual to the default category if the posterior probability is greater than 0.5.
-
 
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+predicted_probs <- predict(fit3, newdata = validation_set, type = "response")
+predicted_class <- ifelse(predicted_probs > 0.5, "Yes", "No")
+conf_matrix <- table(Predicted = predicted_class, Actual = validation_set$default)
+print(conf_matrix)
+
+
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+print(accuracy)
+
 ```
 
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
-
-
-~~~
-
+```
 
 iv. Compute the validation set error, which is the fraction of the observations in the validation set that are misclassified.
 
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+actual_classes <- validation_set$default
+validation_set_error <- mean(predicted_class != actual_classes)
+
+print(validation_set_error)
 ```
 
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
-
-
-~~~
-
+```
 
 (c) Repeat the process in (b) three times, using three different splits of the observations into a training set and a validation set. Comment on the results obtained.
 
-
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+splitIndex <- createDataPartition(y = default$default, p = 0.5, list = FALSE, times = 1)
+training_set <- default[splitIndex, ]
+validation_set <- default[-splitIndex, ]
+
+fit4 <- glm(default ~ student + balance + income, data = training_set, family = binomial)
+
+predicted_probs <- predict(fit4, newdata = validation_set, type = "response")
+predicted_class <- ifelse(predicted_probs > 0.5, "Yes", "No")
+conf_matrix <- table(Predicted = predicted_class, Actual = validation_set$default)
+print(conf_matrix)
+
+
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+paste0("Accuracy is", accuracy)
+
+actual_classes <- validation_set$default
+validation_set_error <- mean(predicted_class != actual_classes)
+
+paste0("validation seterror is", validation_set_error)
 ```
 
 Your answer:
 
-~~~
-Please write your answer in full sentences.
-
-
-~~~
-
+```         
+The result is close to the previous one.
+```
 
 (d) Now consider a logistic regression model that predicts the probability of default using income, balance, and a dummy variable for student. Estimate the test error for this model using the validation set approach. Comment on whether or not including a dummy variable for student leads to a reduction in the test error rate.
 
-
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+
+training_set$student <- as.factor(training_set$student)
+validation_set$student <- as.factor(validation_set$student)
+fit5 <- glm(default ~ income + balance, data = training_set, family = binomial)
+probabilities <- predict(fit5, newdata = validation_set, type = "response")
+predicted_classes <- ifelse(probabilities > 0.5, "Yes", "No")
+actual_classes <- validation_set$default
+validation_set_error <- mean(predicted_classes != actual_classes)
+print(validation_set_error)
 ```
 
 Your answer:
 
-~~~
-Please write your answer in full sentences.
-
-
-~~~
-
+```         
+As the validation set error is close with and without the student predictor, including the 'student' dummy variable has not reduced the test error rate.
+```
 
 ### Default 2
 
-We continue to consider the use of a logistic regression model to predict the probability of default using income and balance on the `Default` data set. In particular, we will now compute estimates for the standard errors of the income and balance logistic regression coefficients in two different ways: (1) using the bootstrap, and (2) using the standard formula for computing the standard errors in the `glm()` function. Do not forget to set a random seed before beginning your analysis.
+We continue to consider the use of a logistic regression model to predict the probability of default using income and balance on the `Default` data set.
+In particular, we will now compute estimates for the standard errors of the income and balance logistic regression coefficients in two different ways: (1) using the bootstrap, and (2) using the standard formula for computing the standard errors in the `glm()` function.
+Do not forget to set a random seed before beginning your analysis.
 
 (a) Using the `summary()` and `glm()` functions, determine the estimated standard errors for the coefficients associated with income and balance in a multiple logistic regression model that uses both predictors.
 
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+fit6 <- glm(default ~ income + balance, data = training_set, family = binomial(link = "logit"))
+model_summary <- summary(fit6)
+print(model_summary)
+
+std_error_income <- model_summary$coefficients["income", "Std. Error"]
+std_error_balance <- model_summary$coefficients["balance", "Std. Error"]
+print(paste("Standard error for income:", std_error_income))
+print(paste("Standard error for balance:", std_error_balance))
+
 ```
 
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
-
-
-~~~
-
+```
 
 (b) Write a function, `boot.fn()`, that takes as input the Default data set as well as an index of the observations, and that outputs the coefficient estimates for income and balance in the multiple logistic regression model.
 
 Your code:
 
-```{r,echo=TRUE}
-#
-#
+```{r,echo=TRUE, warning = F}
+boot.fn <- function(data, index) {
+  fit <- glm(default ~ income + balance, data = data, family = binomial(link = "logit"), subset = index)
+  coef(fit)[c("income", "balance")]
+}
+
+sample_index <- sample(nrow(training_set), 200, replace = TRUE)
+boot_coefficients <- boot.fn(training_set, sample_index)
+
+print(boot_coefficients)
+
 ```
 
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
-
-
-~~~
+```
 
 (c) Use the boot() function together with your boot.fn() function to estimate the standard errors of the logistic regression coefficients for income and balance.
-
 
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+
+boot_results <- boot(data = training_set, statistic = boot.fn, R = 1000)
+print(boot_results)
+
+std_errors <- boot_results$t0
+
+print(paste("Bootstrap standard error for income:", boot_results$t0[1]))
+print(paste("Bootstrap standard error for balance:", boot_results$t0[2]))
+
 ```
 
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
-
-
-~~~
-
+```
 
 (d) Comment on the estimated standard errors obtained using the glm() function and using your bootstrap function.
 
+```{r, echo = T}
+boot_se <- apply(boot_results$t, 2, sd)
+std_error_income_boot <- boot_se[2]  
+std_error_balance_boot <- boot_se[3] 
+print(std_error_income_boot)
+print(std_error_balance_boot)
+
+
+```
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
-
-
-~~~
-
+```
 
 ### Boston housing data set
 
@@ -510,146 +584,123 @@ We will now consider the Boston housing data set, from the ISLR2 library.
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+bos <- Boston
+mu_hat <- mean(bos$medv)
+print(mu_hat)
 ```
 
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
+```
 
-
-~~~
-
-
-(b) Provide an estimate of the standard error of $\hat{\mu}$. Interpret this result.
-Hint: We can compute the standard error of the sample mean by dividing the sample standard deviation by the square root of the number of observations.
+(b) Provide an estimate of the standard error of $\hat{\mu}$. Interpret this result. Hint: We can compute the standard error of the sample mean by dividing the sample standard deviation by the square root of the number of observations.
 
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+medv_se <- sd(bos$medv) / nrow(bos)
+print(medv_se)
 ```
 
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
-
-
-~~~
-
+```
 
 (c) Now estimate the standard error of $\hat{\mu}$ using the bootstrap. How does this compare to your answer from (b)?
 
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+set.seed(123)
+
+se_bootstrap <- rep(NA, 10000)
+for(i in 1:10000){
+  bos_bootstrap <- sample(bos$medv, replace = TRUE)
+  se_bootstrap[i] <- sd(bos_bootstrap)/sqrt(nrow(bos))
+}
+mean(se_bootstrap)
 ```
 
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
+```
 
-
-~~~
-
-(d) Based on your bootstrap estimate from (c), provide a 95% confidence interval for the mean of medv. Compare it to the results obtained using t.test(Boston$medv).
-Hint: You can approximate a 95% confidence interval using the formula $[\hat{\mu} − 2SE(\hat{\mu}), \hat{\mu} + 2SE(\hat{\mu})]$.
+(d) Based on your bootstrap estimate from (c), provide a 95% confidence interval for the mean of medv. Compare it to the results obtained using t.test(Boston\$medv). Hint: You can approximate a 95% confidence interval using the formula $[\hat{\mu} − 2SE(\hat{\mu}), \hat{\mu} + 2SE(\hat{\mu})]$.
 
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+t.test(Boston$medv)
+ci_medv_bootstrap <- c(hat_mu - 2*se_bootstrap, hat_mu + 2*se_bootstrap)
 ```
 
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
-
-
-~~~
-
+```
 
 (e) Based on this data set, provide an estimate, $\hat{\mu}_{med}$, for the median value of medv in the population.
 
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+median(Boston$medv)
 ```
 
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
-
-
-~~~
-
+```
 
 (f) We now would like to estimate the standard error of $\hat{\mu}_{med}$. Unfortunately, there is no simple formula for computing the standard error of the median. Instead, estimate the standard error of the median using the bootstrap. Comment on your findings.
 
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+ se_med_bootstrap <- sd(replicate(10000, median(sample(bos$medv, replace = TRUE))))
 ```
 
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
-
-
-~~~
-
-
+```
 
 (g) Based on this data set, provide an estimate for the tenth percentile of medv in Boston census tracts. Call this quantity $\hat{\mu}_{0.1}$. (You can use the quantile() function.)
 
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+quantile(bos$medv, 0.1)
 ```
 
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
-
-
-~~~
-
+```
 
 (h) Use the bootstrap to estimate the standard error of $\hat{\mu}_{0.1}$. Comment on your findings.
 
 Your code:
 
 ```{r,echo=TRUE}
-#
-#
+ se_quan_bootstrap <- sd(replicate(10000, quantile(sample(bos$medv, replace = TRUE), 0.1)))
 ```
 
 Your answer:
 
-~~~
+```         
 Please write your answer in full sentences.
-
-
-~~~
-
+```
 
 ## Additional Material
 
@@ -658,10 +709,10 @@ Please write your answer in full sentences.
 There are few platforms in R that does predictive modeling.
 These platforms are wrappers around other packages that makes it easy to do routine tasks.
 
-- mlr3 (https://mlr3book.mlr-org.com)
-- tidymodels (https://www.tidymodels.org/)
-- caret (https://topepo.github.io/caret/)
-- h2o (https://docs.h2o.ai/h2o/latest-stable/h2o-r/docs/index.html)
+-   mlr3 (<https://mlr3book.mlr-org.com>)
+-   tidymodels (<https://www.tidymodels.org/>)
+-   caret (<https://topepo.github.io/caret/>)
+-   h2o (<https://docs.h2o.ai/h2o/latest-stable/h2o-r/docs/index.html>)
 
 ```{r,echo=show_code}
 # split the data
@@ -676,22 +727,24 @@ colnames(test)  <- make.names(colnames(test))
 train$SalePrice <- log(train$SalePrice)
 ```
 
-
 #### Resampling using [mlr3](https://mlr3book.mlr-org.com)
 
 In MLR3 resampling for CV is
+
 ```{r,eval=FALSE,echo=TRUE}
 mlr_resamplings$get("cv")
 rsmp("cv")
 ```
 
 resampling for bootstrap is
+
 ```{r,eval=FALSE,echo=TRUE}
 mlr_resamplings$get("bootstrap")
 rsmp("bootstrap")
 ```
 
-They are called using `resample` function   
+They are called using `resample` function
+
 ```{r,echo=show_code}
 # load packages and data
 library(mlr3)
@@ -720,7 +773,6 @@ bmr1$aggregate()
 ```
 
 #### Resampling using [tidymodels](https://www.tidymodels.org/)
-
 
 ```{r,echo=show_code}
 # load packages and data
@@ -758,8 +810,7 @@ prediction=predict(lm_model,newdata = test)
 
 ```
 
-#### Resampling  using h2o
-
+#### Resampling using h2o
 
 #### Starting H2O
 
@@ -783,7 +834,8 @@ test_hf <- as.h2o(test)
 
 ##### Cross validation
 
-You can use K fold cross validation by specifying an integer to nfolds option.  With cross-validated model building, H2O builds K+1 models: K cross-validated model and 1 overarching model over all of the training data.  
+You can use K fold cross validation by specifying an integer to nfolds option.
+With cross-validated model building, H2O builds K+1 models: K cross-validated model and 1 overarching model over all of the training data.
 
 Fitting GLM using 10 fold cross validation.
 
@@ -795,7 +847,9 @@ gaussian.fit.cv
 
 ```
 
-The plot shows the variability of each coefficient among the 10 folds.  The red x is the final estimate. 
+The plot shows the variability of each coefficient among the 10 folds.
+The red x is the final estimate.
+
 ```{r,echo=show_code,eval=FALSE}
 boxplot(t(sapply(sapply(gaussian.fit.cv@model$cross_validation_models, `[[`, "name"), function(x) h2o.coef(h2o.getModel(x)))),
         names = NULL)
